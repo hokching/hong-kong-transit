@@ -6,9 +6,10 @@ import {
   type MapGeoJSONFeature,
 } from "maplibre-gl"
 import { trackPaths } from "../data/mtr-tracks.ts"
-import { lineByCode, lines, stationByCode } from "../lib/network.ts"
 import type { Camera } from "../lib/cameras.ts"
+import { lineByCode, lines, stationByCode } from "../lib/network.ts"
 import type { StationPlace } from "../lib/places.ts"
+import type { LiveTrain } from "../lib/useTrains.ts"
 
 const STYLE = "https://tiles.openfreemap.org/styles/liberty"
 
@@ -17,10 +18,14 @@ type Props = {
   cameras: Camera[] | null
   showLines: boolean
   showCameras: boolean
+  showTrains: boolean
+  trains: LiveTrain[]
+  selectedTrainId: string | null
   selectedCode: string | null
   focus: { lon: number; lat: number; token: number } | null
   onStation: (code: string) => void
   onCamera: (key: string) => void
+  onTrain: (id: string) => void
 }
 
 export function MapCanvas({
@@ -28,10 +33,14 @@ export function MapCanvas({
   cameras,
   showLines,
   showCameras,
+  showTrains,
+  trains,
+  selectedTrainId,
   selectedCode,
   focus,
   onStation,
   onCamera,
+  onTrain,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
@@ -40,6 +49,7 @@ export function MapCanvas({
   const camerasRef = useRef(cameras)
   const onStationRef = useRef(onStation)
   const onCameraRef = useRef(onCamera)
+  const onTrainRef = useRef(onTrain)
   const cameraByKey = useRef(new Map<string, Camera>())
   const navigationRef = useRef(0)
 
@@ -48,6 +58,7 @@ export function MapCanvas({
     camerasRef.current = cameras
     onStationRef.current = onStation
     onCameraRef.current = onCamera
+    onTrainRef.current = onTrain
     cameraByKey.current = new Map((cameras ?? []).map((camera) => [camera.key, camera]))
   })
 
@@ -71,6 +82,7 @@ export function MapCanvas({
       map.resize()
       map.addSource("mtr-lines", { type: "geojson", data: emptyCollection() })
       map.addSource("stations", { type: "geojson", data: emptyCollection() })
+      map.addSource("trains", { type: "geojson", data: emptyCollection() })
       map.addSource("cameras", {
         type: "geojson",
         data: emptyCollection(),
@@ -155,6 +167,36 @@ export function MapCanvas({
           "text-halo-width": 1.4,
         },
       })
+      map.addLayer({
+        id: "trains",
+        type: "circle",
+        source: "trains",
+        paint: {
+          "circle-radius": ["case", ["==", ["get", "selected"], 1], 8, 5.5],
+          "circle-color": "#ffffff",
+          "circle-stroke-width": ["case", ["==", ["get", "selected"], 1], 4, 3],
+          "circle-stroke-color": ["get", "color"],
+        },
+      })
+      map.addLayer({
+        id: "train-arrows",
+        type: "symbol",
+        source: "trains",
+        layout: {
+          "text-field": "▲",
+          "text-font": ["Noto Sans Bold"],
+          "text-size": 11,
+          "text-rotate": ["get", "bearing"],
+          "text-rotation-alignment": "map",
+          "text-allow-overlap": true,
+          "text-ignore-placement": true,
+        },
+        paint: {
+          "text-color": ["get", "color"],
+          "text-halo-color": "#ffffff",
+          "text-halo-width": 0.6,
+        },
+      })
 
       paintNetwork(map, placesRef.current)
       paintCameras(map, camerasRef.current)
@@ -167,6 +209,13 @@ export function MapCanvas({
           navigationRef.current += 1
           onStationRef.current(stationCode)
           easeTo(map, pointCoordinates(stationHit))
+          return
+        }
+        const trainHit = map.queryRenderedFeatures(event.point, { layers: ["trains", "train-arrows"] })[0]
+        const trainId = stringProperty(trainHit, "id")
+        if (trainId) {
+          navigationRef.current += 1
+          onTrainRef.current(trainId)
           return
         }
         const cameraHit = map.queryRenderedFeatures(event.point, { layers: ["camera-points"] })[0]
@@ -194,7 +243,7 @@ export function MapCanvas({
 
       map.on("mousemove", (event) => {
         const hits = map.queryRenderedFeatures(event.point, {
-          layers: ["stations", "camera-points", "camera-clusters"],
+          layers: ["stations", "trains", "train-arrows", "camera-points", "camera-clusters"],
         })
         map.getCanvas().style.cursor = hits.length > 0 ? "pointer" : ""
       })
@@ -247,8 +296,29 @@ export function MapCanvas({
       if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none")
     }
     for (const id of ["mtr-lines", "stations", "station-labels"]) show(id, showLines)
+    for (const id of ["trains", "train-arrows"]) show(id, showTrains)
     for (const id of ["camera-clusters", "camera-count", "camera-points"]) show(id, showCameras)
-  }, [showLines, showCameras, ready])
+  }, [showLines, showCameras, showTrains, ready])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !ready) return
+    const source = map.getSource("trains") as GeoJSONSource | undefined
+    if (!source) return
+    source.setData({
+      type: "FeatureCollection",
+      features: trains.map((train) => ({
+        type: "Feature" as const,
+        properties: {
+          id: train.id,
+          color: train.color,
+          bearing: train.bearing,
+          selected: train.id === selectedTrainId ? 1 : 0,
+        },
+        geometry: { type: "Point" as const, coordinates: [train.lon, train.lat] as [number, number] },
+      })),
+    })
+  }, [trains, selectedTrainId, ready])
 
   useEffect(() => {
     const map = mapRef.current

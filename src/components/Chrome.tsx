@@ -7,8 +7,11 @@ import { LineChip } from "./LineChip.tsx"
 type Props = {
   showLines: boolean
   showCameras: boolean
+  showTrains: boolean
+  trainStatus: string
   onToggleLines: () => void
   onToggleCameras: () => void
+  onToggleTrains: () => void
   placesStatus: string
   cameraStatus: string
   missingStations: string[]
@@ -22,8 +25,11 @@ type Props = {
 export function Chrome({
   showLines,
   showCameras,
+  showTrains,
+  trainStatus,
   onToggleLines,
   onToggleCameras,
+  onToggleTrains,
   placesStatus,
   cameraStatus,
   missingStations,
@@ -64,15 +70,17 @@ export function Chrome({
         <div className="pointer-events-auto rounded-3xl border border-stone-300 bg-[#f7f4ee]/95 p-3 shadow-lg backdrop-blur">
           <p className="text-xs tracking-[0.18em] text-stone-500">香港</p>
           <h1 className="text-2xl font-bold tracking-tight">交通地圖</h1>
-          <p className="text-sm text-stone-600">點車站看出發班次，點快拍點看路面照片。</p>
+          <p className="text-sm text-stone-600">點車站看出發班次，點列車看下一站，點快拍點看路面照片。</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Toggle pressed={showLines} onClick={onToggleLines} label="港鐵" />
+            <Toggle pressed={showTrains} onClick={onToggleTrains} label="列車" />
             <Toggle
               pressed={showCameras}
               onClick={onToggleCameras}
               label={cameraCount === null ? "快拍" : `快拍 ${cameraCount}`}
             />
           </div>
+          {trainStatus && <p className="mt-2 text-xs leading-snug text-stone-600">{trainStatus}</p>}
           <label className="mt-3 block text-sm">
             <span className="sr-only">搜尋車站</span>
             <input
@@ -89,7 +97,7 @@ export function Chrome({
               <span>Map from Lands Department · 資料來源</span>
             </summary>
             <p className="mt-1">
-              車站位置是地政總署車站範圍的中心點。路綫曲線依 OpenStreetMap 的路軌繪製。到站班次來自港鐵公司，快拍圖像來自運輸署，底圖為
+              車站位置是地政總署車站範圍的中心點。路綫曲線依 OpenStreetMap 的路軌繪製。列車位置用港鐵到站倒數估計；收不到倒數時會沿路綫模擬。快拍圖像來自運輸署，底圖為
               OpenFreeMap。圖中是十條重鐵，不含輕鐵。
               {places
                 ? ` 已放上 ${places.length} / ${stations.length} 個車站。`

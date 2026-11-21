@@ -27,14 +27,22 @@ export class RateLimitError extends Error {
 
 const CACHE_MS = 10_000
 const cache = new Map<string, { at: number; schedule: Schedule }>()
-let queue: Promise<void> = Promise.resolve()
+const lanes = {
+  user: { gap: 400, queue: Promise.resolve() },
+  background: { gap: 1600, queue: Promise.resolve() },
+}
 
-export function fetchSchedule(line: string, station: string): Promise<Schedule> {
+export function fetchSchedule(
+  line: string,
+  station: string,
+  lane: "user" | "background" = "user",
+): Promise<Schedule> {
   const key = `${line}|${station}`
   const cached = fresh(key)
   if (cached) return Promise.resolve(cached)
+  const slot = lanes[lane]
 
-  const run = queue.then(async () => {
+  const run = slot.queue.then(async () => {
     const again = fresh(key)
     if (again) return again
     try {
@@ -42,10 +50,10 @@ export function fetchSchedule(line: string, station: string): Promise<Schedule> 
       cache.set(key, { at: Date.now(), schedule })
       return schedule
     } finally {
-      await sleep(400)
+      await sleep(slot.gap)
     }
   })
-  queue = run.then(
+  slot.queue = run.then(
     () => undefined,
     () => undefined,
   )
@@ -154,7 +162,7 @@ export function minutesUntil(now: string | null | undefined, arrival: string | u
   return Math.round((arrivalMs - nowMs) / 60_000)
 }
 
-function hongKongMillis(value: string | null | undefined): number | null {
+export function hongKongMillis(value: string | null | undefined): number | null {
   const match = value?.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/)
   if (!match) return null
   const [, year, month, day, hour, minute, second] = match

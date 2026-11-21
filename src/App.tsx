@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from "react"
 import { Chrome } from "./components/Chrome.tsx"
 import { DetailPanel, type LineQuery } from "./components/DetailPanel.tsx"
 import { MapCanvas } from "./components/MapCanvas.tsx"
+import { TrainCard } from "./components/TrainCard.tsx"
 import { loadCameras, type Camera } from "./lib/cameras.ts"
 import { stationByCode } from "./lib/network.ts"
 import { loadPlaces, type StationPlace } from "./lib/places.ts"
 import { fetchSchedule, RateLimitError } from "./lib/schedule.ts"
+import { useTrains, type LiveTrain } from "./lib/useTrains.ts"
 
 type Selection = { kind: "station"; code: string } | { kind: "camera"; key: string }
 
@@ -17,6 +19,8 @@ export default function App() {
   const [cameraMessage, setCameraMessage] = useState("正在讀取快拍點…")
   const [showLines, setShowLines] = useState(true)
   const [showCameras, setShowCameras] = useState(true)
+  const [showTrains, setShowTrains] = useState(true)
+  const [selectedTrain, setSelectedTrain] = useState<LiveTrain | null>(null)
   const [selection, setSelection] = useState<Selection | null>(null)
   const [lineStates, setLineStates] = useState<Record<string, LineQuery>>({})
   const [retry, setRetry] = useState(0)
@@ -82,6 +86,9 @@ export default function App() {
     }
   }, [selection, retry])
 
+  const { trains, status: trainStatus } = useTrains(places, showTrains)
+  const shownTrain = trains.find((train) => train.id === selectedTrain?.id) ?? null
+
   const placeIndex = useMemo(
     () => new Map((places ?? []).map((place) => [place.code, place])),
     [places],
@@ -117,16 +124,26 @@ export default function App() {
         cameras={cameras}
         showLines={showLines}
         showCameras={showCameras}
+        showTrains={showTrains}
+        trains={trains}
+        selectedTrainId={shownTrain?.id ?? null}
         selectedCode={selection?.kind === "station" ? selection.code : null}
         focus={focus}
         onStation={chooseStation}
         onCamera={(key) => setSelection({ kind: "camera", key })}
+        onTrain={(id) => setSelectedTrain(trains.find((train) => train.id === id) ?? null)}
       />
       <Chrome
         showLines={showLines}
         showCameras={showCameras}
+        showTrains={showTrains}
+        trainStatus={trainStatus}
         onToggleLines={() => setShowLines((value) => !value)}
         onToggleCameras={() => setShowCameras((value) => !value)}
+        onToggleTrains={() => {
+          setShowTrains((value) => !value)
+          setSelectedTrain(null)
+        }}
         placesStatus={placesMessage}
         cameraStatus={cameraMessage}
         missingStations={missingStations}
@@ -136,6 +153,7 @@ export default function App() {
         onPickStation={chooseStation}
         onPickCamera={chooseCamera}
       />
+      {shownTrain && <TrainCard train={shownTrain} lifted={selection !== null} onClose={() => setSelectedTrain(null)} />}
       {selection && (
         <DetailPanel
           selection={selection}
