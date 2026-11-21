@@ -5,6 +5,7 @@ import {
   type Map as MapLibreMap,
   type MapGeoJSONFeature,
 } from "maplibre-gl"
+import { trackPaths } from "../data/mtr-tracks.ts"
 import { lineByCode, lines, stationByCode } from "../lib/network.ts"
 import type { Camera } from "../lib/cameras.ts"
 import type { StationPlace } from "../lib/places.ts"
@@ -266,9 +267,7 @@ function paintNetwork(map: MapLibreMap, places: StationPlace[] | null) {
   const index = new Map((places ?? []).map((place) => [place.code, place]))
   linesSource.setData({
     type: "FeatureCollection",
-    features: lines.flatMap((line) =>
-      line.paths.flatMap((path) => lineSegments(path, index, line.color)),
-    ),
+    features: lines.flatMap((line) => trackFeatures(line, index)),
   })
   stationSource.setData({
     type: "FeatureCollection",
@@ -294,6 +293,27 @@ function paintNetwork(map: MapLibreMap, places: StationPlace[] | null) {
   })
 }
 
+function trackFeatures(
+  line: (typeof lines)[number],
+  index: Map<string, StationPlace>,
+) {
+  const baked = trackPaths[line.code]
+  if (baked && baked.length === line.paths.length) {
+    return baked.flatMap((parts) =>
+      parts.filter((coordinates) => coordinates.length >= 2).map((coordinates) => lineFeature(line.color, coordinates)),
+    )
+  }
+  return line.paths.flatMap((path) => lineSegments(path, index, line.color))
+}
+
+function lineFeature(color: string, coordinates: Array<[number, number]>) {
+  return {
+    type: "Feature" as const,
+    properties: { color },
+    geometry: { type: "LineString" as const, coordinates },
+  }
+}
+
 function lineSegments(path: string[], index: Map<string, StationPlace>, color: string) {
   const features: Array<{
     type: "Feature"
@@ -303,11 +323,7 @@ function lineSegments(path: string[], index: Map<string, StationPlace>, color: s
   let run: Array<[number, number]> = []
   const flush = () => {
     if (run.length >= 2) {
-      features.push({
-        type: "Feature",
-        properties: { color },
-        geometry: { type: "LineString", coordinates: run },
-      })
+      features.push(lineFeature(color, run))
     }
     run = []
   }

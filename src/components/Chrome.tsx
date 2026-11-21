@@ -89,11 +89,11 @@ export function Chrome({
               <span>Map from Lands Department · 資料來源</span>
             </summary>
             <p className="mt-1">
-              車站位置是地政總署車站範圍的中心點。到站班次來自港鐵公司，快拍圖像來自運輸署，底圖為
+              車站位置是地政總署車站範圍的中心點。路綫曲線依 OpenStreetMap 的路軌繪製。到站班次來自港鐵公司，快拍圖像來自運輸署，底圖為
               OpenFreeMap。圖中是十條重鐵，不含輕鐵。
               {places
                 ? ` 已放上 ${places.length} / ${stations.length} 個車站。`
-                : " 車站位置載入後會畫出路綫。"}
+                : " 車站位置載入後會放上車站。"}
             </p>
           </details>
           {(matches.length > 0 || cameraMatches.length > 0) && (
