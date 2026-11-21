@@ -87,7 +87,7 @@ type RawPayload = {
   url?: string
   curr_time?: string
   sys_time?: string
-  data?: Record<string, { UP?: RawTrain[]; DOWN?: RawTrain[] }>
+  data?: Record<string, { UP?: RawTrain[]; DOWN?: RawTrain[]; curr_time?: string }>
 }
 
 export function parseSchedule(line: string, station: string, payload: unknown): Schedule {
@@ -108,35 +108,56 @@ export function parseSchedule(line: string, station: string, payload: unknown): 
   }
 
   const entry = data.data?.[`${line}-${station}`] ?? Object.values(data.data ?? {})[0]
+  const dataTime = data.curr_time || entry?.curr_time || data.sys_time || null
   return {
     ok: true,
     alert,
     delayed: String(data.isdelay ?? "").toUpperCase() === "Y",
     specialUrl: httpUrl(data.url),
-    dataTime: data.curr_time || data.sys_time || null,
+    dataTime,
     directions: [
-      { id: "UP", trains: trainsOf(entry?.UP) },
-      { id: "DOWN", trains: trainsOf(entry?.DOWN) },
+      { id: "UP", trains: trainsOf(entry?.UP, dataTime) },
+      { id: "DOWN", trains: trainsOf(entry?.DOWN, dataTime) },
     ],
   }
 }
 
-function trainsOf(trains: RawTrain[] | undefined): TrainInfo[] {
+function trainsOf(trains: RawTrain[] | undefined, dataTime: string | null): TrainInfo[] {
   return (trains ?? [])
     .filter((train) => train.valid !== "N")
     .slice()
     .sort((a, b) => Number(a.seq ?? 0) - Number(b.seq ?? 0))
     .map((train) => {
-      const minutes = Number(train.ttnt)
       const destCode = train.dest ?? ""
       return {
         destCode,
         destName: stationName(destCode),
         platform: train.plat?.trim() ?? "",
-        minutes: Number.isFinite(minutes) ? minutes : null,
+        minutes: minutesUntil(dataTime, train.time),
         time: clock(train.time),
       }
     })
+}
+
+export function minutesUntil(now: string | null | undefined, arrival: string | undefined): number | null {
+  const nowMs = hongKongMillis(now)
+  const arrivalMs = hongKongMillis(arrival)
+  if (nowMs === null || arrivalMs === null) return null
+  return Math.round((arrivalMs - nowMs) / 60_000)
+}
+
+function hongKongMillis(value: string | null | undefined): number | null {
+  const match = value?.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/)
+  if (!match) return null
+  const [, year, month, day, hour, minute, second] = match
+  return Date.UTC(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour) - 8,
+    Number(minute),
+    Number(second),
+  )
 }
 
 function clock(value: string | undefined): string {

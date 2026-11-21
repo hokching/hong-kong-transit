@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import type { Camera } from "../lib/cameras.ts"
 import { stations } from "../lib/network.ts"
 import type { StationPlace } from "../lib/places.ts"
 import { LineChip } from "./LineChip.tsx"
@@ -12,7 +13,9 @@ type Props = {
   cameraStatus: string
   missingStations: string[]
   places: StationPlace[] | null
+  cameras: Camera[] | null
   onPickStation: (code: string) => void
+  onPickCamera: (key: string) => void
   cameraCount: number | null
 }
 
@@ -25,7 +28,9 @@ export function Chrome({
   cameraStatus,
   missingStations,
   places,
+  cameras,
   onPickStation,
+  onPickCamera,
   cameraCount,
 }: Props) {
   const [query, setQuery] = useState("")
@@ -39,6 +44,19 @@ export function Chrome({
       )
       .slice(0, 8)
   }, [query])
+  const cameraMatches = useMemo(() => {
+    const text = query.trim().toLowerCase()
+    if (!text || !cameras) return []
+    return cameras
+      .filter(
+        (camera) =>
+          camera.key.toLowerCase().includes(text) ||
+          camera.description.toLowerCase().includes(text) ||
+          camera.district.includes(query.trim()) ||
+          camera.region.includes(query.trim()),
+      )
+      .slice(0, 8)
+  }, [cameras, query])
 
   return (
     <>
@@ -60,7 +78,7 @@ export function Chrome({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="搜尋車站，例如中環"
+              placeholder="搜尋車站或快拍點，例如中環、H429F"
               className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2 outline-none focus:border-stone-500"
               data-testid="search"
             />
@@ -78,8 +96,8 @@ export function Chrome({
                 : " 車站位置載入後會畫出路綫。"}
             </p>
           </details>
-          {matches.length > 0 && (
-            <ul className="mt-2 overflow-hidden rounded-2xl border border-stone-200 bg-white">
+          {(matches.length > 0 || cameraMatches.length > 0) && (
+            <ul className="mt-2 max-h-64 overflow-y-auto rounded-2xl border border-stone-200 bg-white">
               {matches.map((station) => (
                 <li key={station.code}>
                   <button
@@ -99,6 +117,24 @@ export function Chrome({
                         <LineChip key={line} code={line} />
                       ))}
                     </span>
+                  </button>
+                </li>
+              ))}
+              {cameraMatches.map((camera) => (
+                <li key={camera.key}>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left hover:bg-stone-50"
+                    onClick={() => {
+                      onPickCamera(camera.key)
+                      setQuery("")
+                    }}
+                  >
+                    <span>
+                      <span className="font-semibold">{camera.description}</span>
+                      <span className="ml-2 text-sm text-stone-500">{camera.key}</span>
+                    </span>
+                    <span className="shrink-0 text-xs font-semibold text-orange-800">快拍</span>
                   </button>
                 </li>
               ))}

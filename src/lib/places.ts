@@ -105,8 +105,8 @@ function signature(): string {
 }
 
 function readCache(): StationPlace[] | null {
-  if (typeof sessionStorage === "undefined") return null
   try {
+    if (typeof sessionStorage === "undefined") return null
     const parsed = JSON.parse(sessionStorage.getItem(CACHE_KEY) ?? "") as {
       signature?: string
       places?: StationPlace[]
@@ -120,10 +120,10 @@ function readCache(): StationPlace[] | null {
 }
 
 function writeCache(places: StationPlace[]) {
-  if (typeof sessionStorage === "undefined") return
   try {
+    if (typeof sessionStorage === "undefined") return
     sessionStorage.setItem(CACHE_KEY, JSON.stringify({ signature: signature(), places }))
   } catch {
-    // A full cache is only a convenience. The map still works without it.
+    // A blocked or full cache must not stop the live coordinate request.
   }
 }

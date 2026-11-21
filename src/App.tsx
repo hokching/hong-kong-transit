@@ -97,6 +97,12 @@ export default function App() {
     return initial
   }
 
+  function chooseCamera(key: string) {
+    setSelection({ kind: "camera", key })
+    const found = cameras?.find((item) => item.key === key)
+    if (found) setFocus({ lon: found.lon, lat: found.lat, token: Date.now() })
+  }
+
   function chooseStation(code: string) {
     setLineStates(loadingState(code))
     setSelection({ kind: "station", code })
@@ -125,8 +131,10 @@ export default function App() {
         cameraStatus={cameraMessage}
         missingStations={missingStations}
         places={places}
+        cameras={cameras}
         cameraCount={cameras?.length ?? null}
         onPickStation={chooseStation}
+        onPickCamera={chooseCamera}
       />
       {selection && (
         <DetailPanel
