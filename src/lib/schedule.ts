@@ -6,6 +6,7 @@ export type TrainInfo = {
   platform: string
   minutes: number | null
   time: string
+  arrivalAt: string | null
 }
 
 export type Schedule = {
@@ -135,8 +136,15 @@ function trainsOf(trains: RawTrain[] | undefined, dataTime: string | null): Trai
         platform: train.plat?.trim() ?? "",
         minutes: minutesUntil(dataTime, train.time),
         time: clock(train.time),
+        arrivalAt: train.time?.match(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/) ? train.time : null,
       }
     })
+}
+
+export function hongKongStamp(nowMs: number): string {
+  const hongKong = new Date(nowMs + 8 * 60 * 60 * 1000)
+  const pad = (value: number) => String(value).padStart(2, "0")
+  return `${hongKong.getUTCFullYear()}-${pad(hongKong.getUTCMonth() + 1)}-${pad(hongKong.getUTCDate())} ${pad(hongKong.getUTCHours())}:${pad(hongKong.getUTCMinutes())}:${pad(hongKong.getUTCSeconds())}`
 }
 
 export function minutesUntil(now: string | null | undefined, arrival: string | undefined): number | null {
