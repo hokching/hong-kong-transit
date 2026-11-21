@@ -33,9 +33,13 @@ export function decodeCameraCsv(buffer: ArrayBuffer): Camera[] {
     const cells = row.split("\t")
     const key = cell(cells, index.key)
     const url = cell(cells, index.url)
-    const lat = Number(cell(cells, index.latitude))
-    const lon = Number(cell(cells, index.longitude))
-    if (!key || !url || !Number.isFinite(lat) || !Number.isFinite(lon)) continue
+    const latitude = cell(cells, index.latitude)
+    const longitude = cell(cells, index.longitude)
+    const lat = Number(latitude)
+    const lon = Number(longitude)
+    if (!key || !url || latitude === "" || longitude === "") continue
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) continue
     cameras.push({
       key,
       region: cell(cells, index.region),

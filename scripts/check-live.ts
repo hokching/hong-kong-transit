@@ -37,8 +37,9 @@ const scheduleResponse = await fetch(
 assert.equal(scheduleResponse.status, 200)
 const central = parseSchedule("ISL", "CEN", await scheduleResponse.json())
 assert.equal(central.ok, true)
-assert.ok(central.directions.some((direction) => direction.trains.length > 0))
-assert.equal(central.directions[0]?.trains[0]?.destName.length > 0, true)
+const populated = central.directions.find((direction) => direction.trains.length > 0)
+assert.ok(populated)
+assert.equal((populated.trains[0]?.destName.length ?? 0) > 0, true)
 
 const image = cameras.find((camera) => camera.key === "H429F")
 assert.ok(image)

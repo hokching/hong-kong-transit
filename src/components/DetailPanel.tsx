@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { Camera } from "../lib/cameras.ts"
 import { lineByCode, stationByCode } from "../lib/network.ts"
-import { type Schedule, type TrainInfo } from "../lib/schedule.ts"
+import { hongKongStamp, minutesUntil, type Schedule, type TrainInfo } from "../lib/schedule.ts"
 import { LineChip } from "./LineChip.tsx"
 
 export type LineQuery =
@@ -23,6 +23,18 @@ type Props = {
 }
 
 export function DetailPanel({ selection, camera, lineStates, onClose, onRetry }: Props) {
+  const closeRef = useRef<HTMLButtonElement>(null)
+  const selectionKey = selection.kind === "station" ? selection.code : selection.key
+
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    closeRef.current?.focus()
+    return () => {
+      if (opener && document.contains(opener)) opener.focus()
+      else document.querySelector<HTMLElement>("[data-testid=search]")?.focus()
+    }
+  }, [selectionKey])
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose()
@@ -47,6 +59,7 @@ export function DetailPanel({ selection, camera, lineStates, onClose, onRetry }:
           )}
         </div>
         <button
+          ref={closeRef}
           type="button"
           className="rounded-full border border-stone-300 px-3 py-1 text-sm hover:bg-white"
           onClick={onClose}
@@ -139,8 +152,14 @@ function LineBlock({ code, query }: { code: string; query: LineQuery | undefined
 }
 
 function ScheduleBody({ schedule }: { schedule: Schedule }) {
+  const now = useNow()
   if (!schedule.ok) {
-    return <p className="text-sm">{schedule.alert ?? "暫時沒有這站的到站資料。"}</p>
+    return (
+      <div className="space-y-2">
+        <p className="text-sm">{schedule.alert ?? "暫時沒有這站的到站資料。"}</p>
+        <SpecialLink url={schedule.specialUrl} />
+      </div>
+    )
   }
   const empty = schedule.directions.filter((direction) => direction.trains.length === 0).length
   return (
@@ -154,26 +173,27 @@ function ScheduleBody({ schedule }: { schedule: Schedule }) {
       )}
       {schedule.directions.flatMap((direction) =>
         direction.trains.map((train, index) => (
-          <TrainRow key={`${direction.id}-${train.destCode}-${index}`} train={train} />
+          <TrainRow key={`${direction.id}-${train.destCode}-${index}`} train={train} now={now} />
         )),
       )}
       {empty === 2 && <p className="text-sm">兩個方向暫時都沒有班次。</p>}
       {empty === 1 && <p className="text-sm text-stone-700">另一方向暫時沒有班次。</p>}
-      {schedule.specialUrl && (
-        <a
-          className="inline-block text-sm font-semibold underline"
-          href={schedule.specialUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
-          特別車務安排
-        </a>
-      )}
+      <SpecialLink url={schedule.specialUrl} />
     </div>
   )
 }
 
-function TrainRow({ train }: { train: TrainInfo }) {
+function SpecialLink({ url }: { url: string | null }) {
+  if (!url) return null
+  return (
+    <a className="inline-block text-sm font-semibold underline" href={url} target="_blank" rel="noreferrer">
+      特別車務安排
+    </a>
+  )
+}
+
+function TrainRow({ train, now }: { train: TrainInfo; now: number }) {
+  const minutes = train.arrivalAt ? minutesUntil(hongKongStamp(now), train.arrivalAt) : train.minutes
   return (
     <div className="flex items-start justify-between gap-3 border-t border-stone-100 py-2">
       <div>
@@ -181,11 +201,20 @@ function TrainRow({ train }: { train: TrainInfo }) {
         {train.platform && <p className="text-sm text-stone-600">月台 {train.platform}</p>}
       </div>
       <div className="text-right">
-        <p className="font-semibold">{minutesLabel(train.minutes)}</p>
+        <p className="font-semibold">{minutesLabel(minutes)}</p>
         {train.time && <p className="text-sm text-stone-500">{train.time}</p>}
       </div>
     </div>
   )
+}
+
+function useNow(): number {
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000)
+    return () => window.clearInterval(timer)
+  }, [])
+  return now
 }
 
 function minutesLabel(minutes: number | null): string {
@@ -216,15 +245,22 @@ function CameraBody({ camera }: { camera: Camera | null }) {
     <div className="space-y-3">
       <Snapshot key={camera.url} url={camera.url} description={camera.description} />
       <p className="text-sm text-stone-600">
-        照片約每兩分鐘更新。若畫面寫著「暫時未能提供服務」，表示這個快拍點目前沒有新照片。
+        運輸署約每兩分鐘發放新照片。下面顯示的是這次載入的畫面；若寫著「暫時未能提供服務」，表示這個快拍點目前沒有新照片。
       </p>
     </div>
   )
 }
 
 function Snapshot({ url, description }: { url: string; description: string }) {
+  const [reloadToken, setReloadToken] = useState(0)
   const [state, setState] = useState<"loading" | "ready" | "error">("loading")
   const [src, setSrc] = useState<string | null>(null)
+  const [loadedAt, setLoadedAt] = useState<string | null>(null)
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setReloadToken((value) => value + 1), 120_000)
+    return () => window.clearInterval(timer)
+  }, [url])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -241,6 +277,7 @@ function Snapshot({ url, description }: { url: string; description: string }) {
           return
         }
         setSrc(objectUrl)
+        setLoadedAt(hongKongStamp(Date.now()).slice(11, 16))
         setState("ready")
       } catch {
         if (controller.signal.aborted) return
@@ -251,7 +288,7 @@ function Snapshot({ url, description }: { url: string; description: string }) {
       controller.abort()
       if (objectUrl) URL.revokeObjectURL(objectUrl)
     }
-  }, [url])
+  }, [reloadToken, url])
 
   if (state === "error") {
     return (
@@ -264,12 +301,25 @@ function Snapshot({ url, description }: { url: string; description: string }) {
     return <p className="text-sm text-stone-600">正在載入最新照片…</p>
   }
   return (
-    <img
-      src={src}
-      alt={description}
-      width={320}
-      height={240}
-      className="w-full rounded-2xl bg-stone-200"
-    />
+    <div className="space-y-2">
+      <img
+        src={src}
+        alt={description}
+        width={320}
+        height={240}
+        className="w-full rounded-2xl bg-stone-200"
+        onError={() => setState("error")}
+      />
+      <div className="flex items-center justify-between gap-3 text-sm text-stone-600">
+        <p>{loadedAt ? `這張照片於 ${loadedAt} 載入` : "正在顯示這次載入的照片"}</p>
+        <button
+          type="button"
+          className="rounded-full border border-stone-300 px-3 py-1 hover:bg-white"
+          onClick={() => setReloadToken((value) => value + 1)}
+        >
+          重新載入
+        </button>
+      </div>
+    </div>
   )
 }

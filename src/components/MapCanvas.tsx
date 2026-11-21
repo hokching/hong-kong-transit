@@ -40,6 +40,7 @@ export function MapCanvas({
   const onStationRef = useRef(onStation)
   const onCameraRef = useRef(onCamera)
   const cameraByKey = useRef(new Map<string, Camera>())
+  const navigationRef = useRef(0)
 
   useEffect(() => {
     placesRef.current = places
@@ -162,6 +163,7 @@ export function MapCanvas({
         const stationHit = map.queryRenderedFeatures(event.point, { layers: ["stations"] })[0]
         const stationCode = stringProperty(stationHit, "code")
         if (stationCode) {
+          navigationRef.current += 1
           onStationRef.current(stationCode)
           easeTo(map, pointCoordinates(stationHit))
           return
@@ -169,6 +171,7 @@ export function MapCanvas({
         const cameraHit = map.queryRenderedFeatures(event.point, { layers: ["camera-points"] })[0]
         const cameraKey = stringProperty(cameraHit, "key")
         if (cameraKey && cameraByKey.current.has(cameraKey)) {
+          navigationRef.current += 1
           onCameraRef.current(cameraKey)
           easeTo(map, pointCoordinates(cameraHit))
           return
@@ -179,7 +182,10 @@ export function MapCanvas({
           const center = pointCoordinates(cluster)
           const source = map.getSource("cameras") as GeoJSONSource
           if (!center) return
+          navigationRef.current += 1
+          const ticket = navigationRef.current
           void source.getClusterExpansionZoom(clusterId).then((zoom) => {
+            if (ticket !== navigationRef.current) return
             map.easeTo({ center, zoom })
           })
         }
@@ -194,6 +200,7 @@ export function MapCanvas({
     })
 
     return () => {
+      navigationRef.current += 1
       setReady(false)
       map.remove()
       mapRef.current = null
@@ -245,6 +252,7 @@ export function MapCanvas({
   useEffect(() => {
     const map = mapRef.current
     if (!map || !ready || !focus) return
+    navigationRef.current += 1
     easeTo(map, [focus.lon, focus.lat])
   }, [focus, ready])
 

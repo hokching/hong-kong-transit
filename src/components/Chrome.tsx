@@ -97,7 +97,7 @@ export function Chrome({
             </p>
           </details>
           {(matches.length > 0 || cameraMatches.length > 0) && (
-            <ul className="mt-2 max-h-64 overflow-y-auto rounded-2xl border border-stone-200 bg-white">
+            <ul className="mt-2 max-h-[40dvh] overflow-y-auto rounded-2xl border border-stone-200 bg-white">
               {matches.map((station) => (
                 <li key={station.code}>
                   <button

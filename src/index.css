@@ -38,7 +38,7 @@ input {
 }
 
 .map-shell.has-panel .maplibregl-ctrl-bottom-right {
-  bottom: min(50dvh, 30rem);
+  bottom: calc(48dvh + 0.75rem);
 }
 
 .maplibregl-ctrl-attrib {
