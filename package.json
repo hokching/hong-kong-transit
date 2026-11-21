@@ -13,7 +13,8 @@
     "check": "node --experimental-strip-types scripts/check-live.ts",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.5",
@@ -31,6 +32,7 @@
     "oxlint": "^1.90.0",
     "pbf": "^4.0.1",
     "typescript": "~7.0.2",
-    "vite": "^8.3.6"
+    "vite": "^8.3.6",
+    "wrangler": "^4.166.0"
   }
 }

@@ -36,13 +36,17 @@ npm run network
 
 ## 正式發佈
 
-正式版打算放到 Cloudflare Workers 免費方案，使用平台提供的 `workers.dev` 網址，不另外買網域。靜態網頁的讀取次數不計入免費額度。地圖和政府資料由瀏覽器直接讀取。
+正式版在 Cloudflare Workers 免費方案：
 
-這一版尚未發佈。驗收之後才部署：
+https://hong-kong-transit.hokching.workers.dev
+
+靜態網頁的讀取次數不計入免費額度。地圖和政府資料由瀏覽器直接讀取。帳號的 `workers.dev` 子網域是 `hokching`。
+
+重新發佈：
 
 ```bash
-npm run build
-npx wrangler deploy
+npx wrangler login
+npm run deploy
 ```
 
-`wrangler.json` 已設成只發佈 `dist` 裡的靜態檔。預計費用是 0 美元。若每日需要 Worker 程式處理超過 10 萬次請求，或要改用自己的網域，才會產生費用。
+`npm run deploy` 會先建置，再用 `wrangler deploy` 只發佈 `dist` 裡的靜態檔。預計費用是 0 美元。若每日需要 Worker 程式處理超過 10 萬次請求，或要改用自己的網域，才會產生費用。
